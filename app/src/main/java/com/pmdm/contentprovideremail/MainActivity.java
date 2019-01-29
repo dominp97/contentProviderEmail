@@ -39,50 +39,54 @@ public class MainActivity extends AppCompatActivity implements ListView.OnItemLo
         Cursor cur = cr.query(ContactsContract.Contacts.CONTENT_URI,
                 proyeccion, filtro, args_filtro, null);
         if (cur.getCount() > 0) {
+            int i = 0;
+            String [] identificadores = new String[cur.getCount()];
             while (cur.moveToNext()) {
                 String identificador = cur.getString(
                         cur.getColumnIndex(ContactsContract.Contacts._ID));
-                enviarSMS(identificador);
+                identificadores[i++] = identificador;
             }
+            enviarEmail(identificadores);
         }
         cur.close();
         return true;
     }
 
     //envia un SMS a los teléfonos de un contacto
-    private void enviarSMS(String identificador) {
+    private void enviarEmail(String[] identificadores) {
         ContentResolver cr = getContentResolver();
-        SmsManager smsManager = SmsManager.getDefault();
         String mensaje = ((EditText) findViewById(R.id.txtSMS)).getText().toString();
-        Cursor cursorTelefono = cr.query(
-                ContactsContract.CommonDataKinds.Email.CONTENT_URI, null,//Email
-                ContactsContract.CommonDataKinds.Email.CONTACT_ID + " = ?",
-                new String[]{identificador}, null);
-        while (cursorTelefono.moveToNext()) {
-            String telefono = cursorTelefono.getString(
-                    cursorTelefono.getColumnIndex(ContactsContract.CommonDataKinds.Email.DATA));
-            try {
-                String email = telefono;/* Your email address here */
-                String subject = "subject";/* Your subject here */
-                String body = "cuerpo";/* Your body here */
-                String chooserTitle = "chooserTitle";/* Your chooser title here */
-                Intent emailIntent = new Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:" + email));
-                emailIntent.putExtra(Intent.EXTRA_SUBJECT, subject);
-                emailIntent.putExtra(Intent.EXTRA_TEXT, body);
-                //emailIntent.putExtra(Intent.EXTRA_HTML_TEXT, body); //If you are using HTML in your body text
+        String[] para = new String[identificadores.length];
 
-                startActivity(Intent.createChooser(emailIntent, "Chooser Title"));
-                /*
-                smsManager.sendTextMessage(telefono, null, mensaje, null, null);
-                Log.d(tag, "SMS enviado.");
-                */
-            } catch (Exception e) {
-                Log.d(tag, "No se pudo enviar el SMS.");
-                e.printStackTrace();
+        for(int i = 0;i<identificadores.length;i++){
+            Cursor cursorTelefono = cr.query(
+                    ContactsContract.CommonDataKinds.Email.CONTENT_URI, null,//Email
+                    ContactsContract.CommonDataKinds.Email.CONTACT_ID + " = ?",
+                    new String[]{identificadores[i]}, null);
+
+            while(cursorTelefono.moveToNext()){
+                String email = cursorTelefono.getString(
+                        cursorTelefono.getColumnIndex(ContactsContract.CommonDataKinds.Email.DATA));
+                        para[i] = email;
+
             }
-
+            cursorTelefono.close();
         }
-        cursorTelefono.close();
+
+        //Envio x intent
+
+        Intent i = new Intent();
+        Intent chooser = null;
+        i.setAction(Intent.ACTION_SEND);
+        i.setData(Uri.parse("mailto:"));
+        i.putExtra(Intent.EXTRA_EMAIL, para);
+        i.putExtra(Intent.EXTRA_SUBJECT, "Email de prueba");
+        i.putExtra(Intent.EXTRA_TEXT, mensaje);
+        i.setType("mensaje/rfc22");
+        chooser = i.createChooser(i, "Enviar mensaje");
+        startActivity(chooser);
+
+
     }
 
     @Override
@@ -95,25 +99,25 @@ public class MainActivity extends AppCompatActivity implements ListView.OnItemLo
 
     public void buscar(View v) {
         EditText txtNombre = (EditText) findViewById(R.id.txtContacto);
-
-        String proyeccion[] = {ContactsContract.Contacts._ID,
-                ContactsContract.Contacts.DISPLAY_NAME};
+        //Creamos query
+        String proyeccion[] = {ContactsContract.CommonDataKinds.Email.DATA,
+                ContactsContract.Contacts._ID,
+                ContactsContract.Contacts.DISPLAY_NAME,
+        };
         String filtro = ContactsContract.Contacts.DISPLAY_NAME + " like ?";
         String args_filtro[] = {"%" + txtNombre.getText().toString() + "%"};
 
+
+        //Ejecutamos query
         List<String> lista_contactos = new ArrayList<String>();
         ContentResolver cr = getContentResolver();
-        Cursor cur = cr.query(ContactsContract.Email.CONTENT_URI,
+        Cursor cur = cr.query(ContactsContract.CommonDataKinds.Email.CONTENT_URI,
                 proyeccion, filtro, args_filtro, null);
         if (cur.getCount() > 0) {
             while (cur.moveToNext()) {
-                String id = cur.getString(
-                        cur.getColumnIndex(ContactsContract.Contacts._ID));
                 String name = cur.getString(
                         cur.getColumnIndex(ContactsContract.Contacts.DISPLAY_NAME));
-                if (Integer.parseInt(cur.getString(cur.getColumnIndex(ContactsContract.Contacts.HAS_PHONE_NUMBER))) > 0) {
-                    lista_contactos.add(name);
-                }
+                lista_contactos.add(name);
             }
         }
         cur.close();
